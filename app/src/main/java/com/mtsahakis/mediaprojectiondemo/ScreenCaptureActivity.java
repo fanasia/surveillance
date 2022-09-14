@@ -5,6 +5,7 @@ import android.annotation.SuppressLint;
 import android.annotation.TargetApi;
 import android.app.AlertDialog;
 import android.content.DialogInterface;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.app.Activity;
 import android.app.ActivityManager;
@@ -20,10 +21,14 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.provider.Settings;
+import android.text.InputType;
 import android.util.Log;
+import android.view.LayoutInflater;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.widget.Button;
+import android.widget.EditText;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import org.apache.http.HttpEntity;
@@ -82,6 +87,8 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
+import com.google.android.material.textfield.TextInputEditText;
+
 
 public class ScreenCaptureActivity extends AppCompatActivity {
 
@@ -90,6 +97,8 @@ public class ScreenCaptureActivity extends AppCompatActivity {
     final int delay = 5000; // 1000 milliseconds == 1 second
     final Handler oshandler = new Handler();
     final int osdelay = 1000; // 1000 milliseconds == 1 second
+
+    SharedPreferences prefs = null;
 
     public static final int MY_PERMISSIONS_REQUEST_LOCATION = 99;
     private String username;
@@ -127,10 +136,51 @@ public class ScreenCaptureActivity extends AppCompatActivity {
         // get mac address
 //        ((OSLog)this.getApplication()).setUsername(getMacAddr());
 //        Log.e(TAG, "this is not called eh?");
+
         // generate random ID
          String randomID = UUID.randomUUID().toString();
          ((OSLog)this.getApplication()).setUsername(randomID);
          username = randomID;
+
+         // setting default username to usernameValue
+        TextView usernameValueTextView = (TextView) findViewById(R.id.usernameValue);
+        usernameValueTextView.setText(username);
+
+         // setting shared preferences
+        prefs = getSharedPreferences("com.mtsahakis.mediaprojectiondemo", MODE_PRIVATE);
+
+        // edit username button
+        Button editUsernameButton = findViewById(R.id.editUsernameButton);
+        editUsernameButton.setOnClickListener(new OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                LayoutInflater inflater = getLayoutInflater();
+                View alertLayout = inflater.inflate(R.layout.layout_custom_dialog, null);
+                TextInputEditText etUsername = alertLayout.findViewById(R.id.usernameInput);
+
+                AlertDialog.Builder builder = new AlertDialog.Builder(ScreenCaptureActivity.this);
+                builder.setTitle("Input your username");
+                builder.setView(alertLayout);
+
+                // Set up the buttons
+                builder.setPositiveButton("OK", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        username = etUsername.getText().toString();
+                    }
+                });
+
+                builder.setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        dialog.cancel();
+                    }
+                });
+
+                AlertDialog dialog = builder.create();
+                dialog.show();
+            }
+        });
     }
 
     @Override
@@ -139,6 +189,42 @@ public class ScreenCaptureActivity extends AppCompatActivity {
 
         // asking permission
         enableMyLocation();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+
+        // input username if it's first run
+        if (prefs.getBoolean("first_run", true)) {
+            // open pop up to input username from laptop
+            LayoutInflater inflater = getLayoutInflater();
+            View alertLayout = inflater.inflate(R.layout.layout_custom_dialog, null);
+            TextInputEditText etUsername = alertLayout.findViewById(R.id.usernameInput);
+
+            AlertDialog.Builder builder = new AlertDialog.Builder(ScreenCaptureActivity.this);
+            builder.setTitle("Input your username");
+            builder.setView(alertLayout);
+
+            // Set up the buttons
+            builder.setCancelable(false);
+            builder.setPositiveButton("OK", new DialogInterface.OnClickListener() {
+                @Override
+                public void onClick(DialogInterface dialog, int which) {
+                    username = etUsername.getText().toString();
+                }
+            });
+
+            AlertDialog dialog = builder.create();
+            dialog.show();
+
+            // using the following line to edit/commit prefs
+            prefs.edit().putBoolean("first_run", false).commit();
+        }
+
+        // keep setting text view with username
+        TextView usernameValueTextView = (TextView) findViewById(R.id.usernameValue);
+        usernameValueTextView.setText(username);
     }
 
     @Override

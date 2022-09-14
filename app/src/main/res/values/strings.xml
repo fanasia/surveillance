@@ -4,6 +4,9 @@
     <string name="start_recording">Start Recording</string>
     <string name="stop_recording">Stop Recording</string>
     <string name="recording">Recording</string>
+    <string name="edit_username">Edit Username</string>
+    <string name="fill_username_label">Input your username</string>
+
     <string name="accessibility_service_description">MyAccessibility</string>
 
     <string name="title_location_permission">Request Location Permission</string>

@@ -1,0 +1,570 @@
+package com.mtsahakis.mediaprojectiondemo;
+
+import android.Manifest;
+import android.annotation.SuppressLint;
+import android.annotation.TargetApi;
+import android.app.AlertDialog;
+import android.content.DialogInterface;
+import android.content.pm.PackageManager;
+import android.app.Activity;
+import android.app.ActivityManager;
+import android.app.usage.UsageStats;
+import android.app.usage.UsageStatsManager;
+import android.content.Context;
+import android.content.Intent;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.media.projection.MediaProjectionManager;
+import android.os.AsyncTask;
+import android.os.Build;
+import android.os.Bundle;
+import android.os.Handler;
+import android.provider.Settings;
+import android.util.Log;
+import android.view.View;
+import android.view.View.OnClickListener;
+import android.widget.Button;
+import android.widget.Toast;
+
+import org.apache.http.HttpEntity;
+import org.apache.http.HttpResponse;
+import org.apache.http.client.HttpClient;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.conn.scheme.Scheme;
+import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
+import org.apache.http.conn.ssl.SSLSocketFactory;
+import org.apache.http.conn.ssl.TrustSelfSignedStrategy;
+import org.apache.http.entity.ContentType;
+import org.apache.http.entity.mime.HttpMultipartMode;
+import org.apache.http.entity.mime.MultipartEntity;
+import org.apache.http.entity.mime.MultipartEntityBuilder;
+import org.apache.http.entity.mime.content.ByteArrayBody;
+import org.apache.http.entity.mime.content.FileBody;
+import org.apache.http.entity.mime.content.StringBody;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.DefaultHttpClient;
+import org.apache.http.impl.client.HttpClients;
+import org.apache.http.ssl.SSLContextBuilder;
+import org.json.JSONException;
+import org.json.JSONObject;
+
+import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.FileReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.UnsupportedEncodingException;
+import java.lang.annotation.Target;
+import java.net.NetworkInterface;
+import java.nio.charset.StandardCharsets;
+import java.security.KeyManagementException;
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
+import java.security.cert.X509Certificate;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Date;
+import java.util.List;
+import java.util.UUID;
+
+import javax.net.ssl.HostnameVerifier;
+import javax.net.ssl.HttpsURLConnection;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLSession;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.X509TrustManager;
+
+import static android.content.ContentValues.TAG;
+
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
+
+
+public class ScreenCaptureActivity extends AppCompatActivity {
+
+    private static final int REQUEST_CODE = 100;
+    final Handler handler = new Handler();
+    final int delay = 5000; // 1000 milliseconds == 1 second
+    final Handler oshandler = new Handler();
+    final int osdelay = 1000; // 1000 milliseconds == 1 second
+
+    public static final int MY_PERMISSIONS_REQUEST_LOCATION = 99;
+    private String username;
+
+    /****************************************** Activity Lifecycle methods ************************/
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_main);
+
+        // start projection
+        Button startButton = findViewById(R.id.startButton);
+        startButton.setOnClickListener(new OnClickListener() {
+
+            @Override
+            public void onClick(View v) {
+                startLocationService();
+                startProjection();
+            }
+        });
+
+        // stop projection
+        Button stopButton = findViewById(R.id.stopButton);
+        stopButton.setOnClickListener(new OnClickListener() {
+
+            @Override
+            public void onClick(View v) {
+                stopLocationService();
+                stopProjection();
+
+                Toast.makeText(getApplication().getApplicationContext(), "Service is stopped", Toast.LENGTH_SHORT).show();
+            }
+        });
+
+        // get mac address
+//        ((OSLog)this.getApplication()).setUsername(getMacAddr());
+//        Log.e(TAG, "this is not called eh?");
+        // generate random ID
+         String randomID = UUID.randomUUID().toString();
+         ((OSLog)this.getApplication()).setUsername(randomID);
+         username = randomID;
+    }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+
+        // asking permission
+        enableMyLocation();
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+
+        if (requestCode == REQUEST_CODE) {
+            if (resultCode == Activity.RESULT_OK) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    startForegroundService(com.mtsahakis.mediaprojectiondemo.ScreenCaptureService.getStartIntent(this, resultCode, data));
+                } else {
+                    startService(com.mtsahakis.mediaprojectiondemo.ScreenCaptureService.getStartIntent(this, resultCode, data));
+                }
+            }
+        }
+    }
+
+    /****************************************** Location ******************************************/
+
+    private void enableMyLocation() {
+        if (checkPermission(Manifest.permission.ACCESS_FINE_LOCATION)) {
+
+            // give explanation
+            if (ActivityCompat.shouldShowRequestPermissionRationale(this,
+                    Manifest.permission.ACCESS_FINE_LOCATION)) {
+
+                new AlertDialog.Builder(this)
+                        .setTitle(R.string.title_location_permission)
+                        .setMessage(R.string.text_location_permission)
+                        .setPositiveButton(R.string.ok, new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialogInterface, int i) {
+                                //Prompt the user once explanation has been shown
+                                ActivityCompat.requestPermissions(ScreenCaptureActivity.this,
+                                        new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
+                                        MY_PERMISSIONS_REQUEST_LOCATION);
+                            }
+                        })
+                        .setNegativeButton(R.string.cancel, new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialogInterface, int i) {
+                                dialogInterface.cancel();
+                            }
+                        })
+                        .create()
+                        .show();
+            } else {
+                // request the permission.
+                ActivityCompat.requestPermissions(ScreenCaptureActivity.this,
+                        new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
+                        MY_PERMISSIONS_REQUEST_LOCATION);
+            }
+        } else {
+            Toast.makeText(this, "Location permission (already) granted", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    @TargetApi(30)
+    private void enableBackgroundLocation() {
+        if (checkPermission(Manifest.permission.ACCESS_BACKGROUND_LOCATION)) {
+            new AlertDialog.Builder(this)
+                    .setTitle(R.string.title_location_permission)
+                    .setMessage(R.string.text_background_location_permission)
+                    .setPositiveButton(R.string.update_settings, new DialogInterface.OnClickListener() {
+                        @Override
+                        public void onClick(DialogInterface dialogInterface, int i) {
+                            //Prompt the user once explanation has been shown
+                            ActivityCompat.requestPermissions(ScreenCaptureActivity.this,
+                                    new String[]{Manifest.permission.ACCESS_BACKGROUND_LOCATION},
+                                    MY_PERMISSIONS_REQUEST_LOCATION);
+                        }
+                    })
+                    .setNegativeButton(R.string.cancel, new DialogInterface.OnClickListener() {
+                        @Override
+                        public void onClick(DialogInterface dialogInterface, int i) {
+                            dialogInterface.cancel();
+                        }
+                    })
+                    .create()
+                    .show();
+        }
+    }
+
+    private boolean checkPermission(String permission) {
+        return ContextCompat.checkSelfPermission(this,
+                permission) != PackageManager.PERMISSION_GRANTED;
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode,
+                                           String permissions[], int[] grantResults) {
+        switch (requestCode) {
+            case MY_PERMISSIONS_REQUEST_LOCATION: {
+                // If request is cancelled, the result arrays are empty.
+                if (grantResults.length > 0
+                        && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+
+                    // permission was granted, yay! Do the
+                    // location-related task you need to do.
+                    if (ContextCompat.checkSelfPermission(this,
+                            Manifest.permission.ACCESS_FINE_LOCATION)
+                            == PackageManager.PERMISSION_GRANTED) {
+
+                        //ask for background permission
+                        enableBackgroundLocation();
+                    }
+                } else {
+                    // permission denied, boo! Disable the
+                    // functionality that depends on this permission.
+
+                    // show toast
+                    Toast.makeText(this, "Location permission denied", Toast.LENGTH_SHORT).show();
+                }
+                return;
+            }
+
+        }
+    }
+
+    private void startLocationService() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(new Intent(this,LocationService.class));
+        } else {
+            startService(new Intent(this, LocationService.class));
+        }
+    }
+
+    private void stopLocationService() {
+        stopService(new Intent(this, LocationService.class));
+    }
+
+    /****************************************** UI Widget Callbacks *******************************/
+    private void startProjection() {
+        MediaProjectionManager mProjectionManager =
+                (MediaProjectionManager) getSystemService(Context.MEDIA_PROJECTION_SERVICE);
+        startActivityForResult(mProjectionManager.createScreenCaptureIntent(), REQUEST_CODE);
+        handler.postDelayed(new Runnable() {
+            public void run() {
+                File externalFilesDir = getExternalFilesDir(null);
+                String mStoreDir = externalFilesDir.getAbsolutePath() + "/oslog/";
+                File dir = new File(mStoreDir);
+                if (dir.exists()) {
+                    File[] files = dir.listFiles();
+                    Arrays.sort(files);
+                    if (files != null) {
+
+                        for (int i = 0; i < files.length; ++i) {
+                            File file = files[i];
+                            //file.delete();
+                            new RetrieveFeedTask().execute(file.getName());
+                        }
+                    }
+                }
+                handler.postDelayed(this, delay);
+            }
+        }, delay);
+
+        /*oshandler.postDelayed(new Runnable() {
+            public void run() {
+                try {
+                    Log.e(TAG, "???? os os "+ getOSLog().get("username").toString() );
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                }
+                oshandler.postDelayed(this, osdelay);
+                FileOutputStream fos = null;
+                try {
+                    File externalFilesDir = getExternalFilesDir(null);
+                    String mStoreDir = externalFilesDir.getAbsolutePath() + "/oslog/";
+                    fos = new FileOutputStream(mStoreDir + (System.currentTimeMillis() / 1000) + ".txt");
+                    byte[] bytesArray = getOSLog().toString().getBytes();
+
+                    fos.write(bytesArray);
+                    fos.flush();
+
+                }catch (Exception e) {
+                    Log.e(TAG,e.toString());
+
+                }
+
+
+
+            }
+        }, osdelay);*/
+    }
+
+    private void stopProjection() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(com.mtsahakis.mediaprojectiondemo.ScreenCaptureService.getStopIntent(this));
+        } else {
+            startService(com.mtsahakis.mediaprojectiondemo.ScreenCaptureService.getStopIntent(this));
+        }
+    }
+
+    /*private class DownloadFilesTask extends AsyncTask<String, Integer, Long> {
+        protected Long doInBackground(String... urls) {
+            int count = urls.length;
+            long totalSize = 0;
+            for (int i = 0; i < count; i++) {
+                Log.e(TAG,"???? "+i);
+            }
+            return totalSize;
+        }
+
+        protected void onProgressUpdate(Integer... progress) {
+
+        }
+
+        protected void onPostExecute(Long result) {
+
+        }
+    }*/
+
+    public JSONObject getOSLog() {
+        JSONObject json = new JSONObject();
+        Log.e(TAG, "JSON " + ((OSLog) this.getApplication()).toString());
+        try {
+            json = new JSONObject(((OSLog) this.getApplication()).toString());
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
+        return json;
+    }
+
+    class RetrieveFeedTask extends AsyncTask<String, Void, String> {
+
+        private Exception exception;
+
+        protected String doInBackground(String... fnames) {
+            try {
+                String res = "";
+                File externalFilesDir = getExternalFilesDir(null);
+                for (String fname : fnames) {
+                    String osPath = externalFilesDir.getAbsolutePath() + "/oslog/" + fname;
+                    String photoPath = externalFilesDir.getAbsolutePath() + "/screenshots/" + fname.replaceAll(".txt", ".png");
+                    if ((new File(photoPath).exists()) == false) {
+                        Log.e(TAG, "file not exist " + photoPath);
+                        new File(osPath).delete();
+                        break;
+                    }
+                    HttpsTrustManager.allowAllSSL();
+                    HttpClient httpClient = new DefaultHttpClient();
+                    httpClient.getConnectionManager().getSchemeRegistry().register(new Scheme("https", SSLSocketFactory.getSocketFactory(), 443));
+                    HttpPost postRequest = new HttpPost("https://entity.cs.helsinki.fi/upload.php");
+                    //MultipartEntity reqEntity = new MultipartEntity(HttpMultipartMode.BROWSER_COMPATIBLE);
+                    MultipartEntityBuilder builder = MultipartEntityBuilder.create();
+                    builder.setMode(HttpMultipartMode.BROWSER_COMPATIBLE);
+                    JSONObject info = readFromFile(osPath);
+                    if (info.length() == 0) {
+                        new File(osPath).delete();
+                        new File(photoPath).delete();
+                        break;
+                    }
+                    info.put("filename", fname.replaceAll(".txt", ""));
+                    String extra = info.toString();
+                    //reqEntity.addPart("extra", new StringBody(extra, "text/plain", StandardCharsets.UTF_8));
+                    //reqEntity.addPart("lang", new StringBody("en"));
+                    //reqEntity.addPart("username", new StringBody(getMacAddr()));
+                    builder.addPart("extra", new StringBody(extra, ContentType.TEXT_PLAIN));
+                    builder.addPart("lang", new StringBody("en", ContentType.TEXT_PLAIN));
+                    // should change this into the username in log as well
+//                    builder.addPart("username", new StringBody(getMacAddr(), ContentType.TEXT_PLAIN));
+                    builder.addPart("username", new StringBody(username, ContentType.TEXT_PLAIN));
+                    try {
+                        ByteArrayOutputStream bos = new ByteArrayOutputStream();
+                        BitmapFactory.Options options = new BitmapFactory.Options();
+                        options.inPreferredConfig = Bitmap.Config.ARGB_8888;
+                        Bitmap bitmap = BitmapFactory.decodeFile(photoPath, options);
+                        bitmap.compress(Bitmap.CompressFormat.JPEG, 75, bos);
+                        byte[] data = bos.toByteArray();
+                        ByteArrayBody bab = new ByteArrayBody(data, fname);
+                        //reqEntity.addPart("image", bab);
+                        builder.addPart("image", bab);
+                    } catch (Exception e) {
+                        //Log.v("Exception in Image", ""+e);
+                        //reqEntity.addPart("picture", new StringBody(""));
+                        builder.addPart("exception_in_image", new StringBody(e.toString(), ContentType.TEXT_PLAIN));
+                    }
+                    HttpEntity entity = builder.build();
+                    postRequest.setEntity(entity);
+                    HttpResponse response = httpClient.execute(postRequest);
+                    BufferedReader reader = new BufferedReader(new InputStreamReader(response.getEntity().getContent(), "UTF-8"));
+                    String sResponse;
+                    StringBuilder s = new StringBuilder();
+                    while ((sResponse = reader.readLine()) != null) {
+                        s = s.append(sResponse);
+                    }
+                    res = s.toString();
+                    if (res.equals("file uploaded")) {
+                        Log.e(TAG, "response " + s + "delete ..." + osPath);
+                        File osFile = new File(osPath);
+                        File photoFile = new File(photoPath);
+                        osFile.delete();
+                        photoFile.delete();
+                    }
+                }
+
+                return res;
+            } catch (Exception e) {
+                Log.e(TAG, "response " + e.toString());
+                this.exception = e;
+
+                return "";
+            } finally {
+            }
+        }
+
+        protected void onPostExecute(String feed) {
+            // TODO: check this.exception
+            // TODO: do something with the feed
+        }
+    }
+
+    public static class HttpsTrustManager implements X509TrustManager {
+
+        private static TrustManager[] trustManagers;
+        private static final X509Certificate[] _AcceptedIssuers = new X509Certificate[]{};
+
+        @Override
+        public void checkClientTrusted(
+                java.security.cert.X509Certificate[] x509Certificates, String s)
+                throws java.security.cert.CertificateException {
+
+        }
+
+        @Override
+        public void checkServerTrusted(
+                java.security.cert.X509Certificate[] x509Certificates, String s)
+                throws java.security.cert.CertificateException {
+
+        }
+
+        public boolean isClientTrusted(X509Certificate[] chain) {
+            return true;
+        }
+
+        public boolean isServerTrusted(X509Certificate[] chain) {
+            return true;
+        }
+
+        @Override
+        public X509Certificate[] getAcceptedIssuers() {
+            return _AcceptedIssuers;
+        }
+
+        public static void allowAllSSL() {
+            HttpsURLConnection.setDefaultHostnameVerifier(new HostnameVerifier() {
+
+                @Override
+                public boolean verify(String arg0, SSLSession arg1) {
+                    return true;
+                }
+
+            });
+
+            SSLContext context = null;
+            if (trustManagers == null) {
+                trustManagers = new TrustManager[]{new HttpsTrustManager()};
+            }
+
+            try {
+                context = SSLContext.getInstance("TLS");
+                context.init(null, trustManagers, new SecureRandom());
+            } catch (NoSuchAlgorithmException e) {
+                e.printStackTrace();
+            } catch (KeyManagementException e) {
+                e.printStackTrace();
+            }
+
+            HttpsURLConnection.setDefaultSSLSocketFactory(context
+                    .getSocketFactory());
+        }
+
+    }
+
+    public static String getMacAddr() {
+        try {
+            List<NetworkInterface> all = Collections.list(NetworkInterface.getNetworkInterfaces());
+            for (NetworkInterface nif : all) {
+                if (!nif.getName().equalsIgnoreCase("wlan0")) continue;
+
+                byte[] macBytes = nif.getHardwareAddress();
+                if (macBytes == null) {
+                    return "";
+                }
+
+                StringBuilder res1 = new StringBuilder();
+                for (byte b : macBytes) {
+                    res1.append(String.format("%02X:", b));
+                }
+
+                if (res1.length() > 0) {
+                    res1.deleteCharAt(res1.length() - 1);
+                }
+
+                Log.e(TAG, "MacAddressFay = " + res1.toString());
+                return res1.toString();
+            }
+        } catch (Exception ex) {
+            ex.printStackTrace();
+        }
+        return "02:00:00:00:00:00";
+    }
+
+    public JSONObject readFromFile(String osPath) {
+        JSONObject res = new JSONObject();
+        //Get the text file
+        File file = new File(osPath);
+
+        //Read text from file
+        StringBuilder text = new StringBuilder();
+
+        try {
+            BufferedReader br = new BufferedReader(new FileReader(file));
+            String line;
+
+            while ((line = br.readLine()) != null) {
+                text.append(line);
+            }
+            res = new JSONObject(String.valueOf(text));
+            Log.e(TAG, "read os " + res);
+            br.close();
+        } catch (IOException | JSONException e) {
+            //You'll need to add proper error handling here
+            Log.e(TAG, "read os " + e.toString());
+        }
+        return res;
+    }
+}

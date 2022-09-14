@@ -1,0 +1,22 @@
+<resources>
+    <string name="app_name">Surveillance</string>
+    <string name="action_settings">Settings</string>
+    <string name="start_recording">Start Recording</string>
+    <string name="stop_recording">Stop Recording</string>
+    <string name="recording">Recording</string>
+    <string name="accessibility_service_description">MyAccessibility</string>
+
+    <string name="title_location_permission">Request Location Permission</string>
+    <string name="text_location_permission">To improve the recommendation service, allow Surveillance
+        to use your location all of the time.
+
+        This app requires location data of the device to be sent to the recommendation service even
+        when the app is closed or not in use.</string>
+    <string name="text_background_location_permission">Allow us to access your location all the time
+        so we can provide better recommendations</string>
+
+    <string name="ok">OK</string>
+    <string name="update_settings">Update Setting</string>
+    <string name="cancel">Cancel</string>
+
+</resources>

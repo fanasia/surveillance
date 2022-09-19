@@ -81,6 +81,7 @@ import javax.net.ssl.SSLSession;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.X509TrustManager;
 
+import static android.accounts.AccountManager.KEY_PASSWORD;
 import static android.content.ContentValues.TAG;
 
 import androidx.appcompat.app.AppCompatActivity;
@@ -99,9 +100,11 @@ public class ScreenCaptureActivity extends AppCompatActivity {
     final int osdelay = 1000; // 1000 milliseconds == 1 second
 
     SharedPreferences prefs = null;
+    final String KEY_USERNAME = "username_key";
 
     public static final int MY_PERMISSIONS_REQUEST_LOCATION = 99;
-    private String username;
+    private String defaultUsername;
+    private EditText etUsername;
 
     /****************************************** Activity Lifecycle methods ************************/
     @Override
@@ -133,30 +136,45 @@ public class ScreenCaptureActivity extends AppCompatActivity {
             }
         });
 
-        // get mac address
-//        ((OSLog)this.getApplication()).setUsername(getMacAddr());
-//        Log.e(TAG, "this is not called eh?");
+        // generate random ID and set to log
+        String randomID = UUID.randomUUID().toString();
 
-        // generate random ID
-         String randomID = UUID.randomUUID().toString();
-         ((OSLog)this.getApplication()).setUsername(randomID);
-         username = randomID;
-
-         // setting default username to usernameValue
-        TextView usernameValueTextView = (TextView) findViewById(R.id.usernameValue);
-        usernameValueTextView.setText(username);
-
-         // setting shared preferences
+        // setting shared preferences and save username
         prefs = getSharedPreferences("com.mtsahakis.mediaprojectiondemo", MODE_PRIVATE);
+        SharedPreferences.Editor ed = prefs.edit();
+        TextView usernameValueTextView = (TextView) findViewById(R.id.usernameValue);
+        if (prefs.getString(KEY_USERNAME, "").equals("")) {
+            defaultUsername = randomID;
+
+            ed.putString(KEY_USERNAME, defaultUsername);
+            ed.commit();
+
+            setUsernameInOSLog(defaultUsername);
+
+            // setting default username to usernameValue
+            usernameValueTextView.setText(defaultUsername);
+        } else {
+            String username = prefs.getString(KEY_USERNAME, defaultUsername);
+
+            setUsernameInOSLog(username);
+
+            // setting default username to usernameValue
+            usernameValueTextView.setText(username);
+        }
 
         // edit username button
         Button editUsernameButton = findViewById(R.id.editUsernameButton);
         editUsernameButton.setOnClickListener(new OnClickListener() {
             @Override
             public void onClick(View v) {
+                // show pop up
                 LayoutInflater inflater = getLayoutInflater();
                 View alertLayout = inflater.inflate(R.layout.layout_custom_dialog, null);
-                TextInputEditText etUsername = alertLayout.findViewById(R.id.usernameInput);
+                etUsername = alertLayout.findViewById(R.id.usernameInput);
+
+                // setting last username as a username in editText
+                String username = prefs.getString(KEY_USERNAME, defaultUsername);
+                etUsername.setText(username);
 
                 AlertDialog.Builder builder = new AlertDialog.Builder(ScreenCaptureActivity.this);
                 builder.setTitle("Input your username");
@@ -166,7 +184,19 @@ public class ScreenCaptureActivity extends AppCompatActivity {
                 builder.setPositiveButton("OK", new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface dialog, int which) {
-                        username = etUsername.getText().toString();
+                        // update username in shared preferences
+                        SharedPreferences.Editor ed = prefs.edit();
+                        String newUsername = etUsername.getText().toString();
+
+                        ed.putString(KEY_USERNAME, newUsername);
+                        ed.commit();
+
+                        // setting default username to usernameValue
+                        TextView usernameValueTextView = (TextView) findViewById(R.id.usernameValue);
+                        usernameValueTextView.setText(newUsername);
+
+                        // set username in oslog
+                        setUsernameInOSLog(newUsername);
                     }
                 });
 
@@ -197,10 +227,10 @@ public class ScreenCaptureActivity extends AppCompatActivity {
 
         // input username if it's first run
         if (prefs.getBoolean("first_run", true)) {
-            // open pop up to input username from laptop
+            // show pop up
             LayoutInflater inflater = getLayoutInflater();
             View alertLayout = inflater.inflate(R.layout.layout_custom_dialog, null);
-            TextInputEditText etUsername = alertLayout.findViewById(R.id.usernameInput);
+            etUsername = alertLayout.findViewById(R.id.usernameInput);
 
             AlertDialog.Builder builder = new AlertDialog.Builder(ScreenCaptureActivity.this);
             builder.setTitle("Input your username");
@@ -211,7 +241,19 @@ public class ScreenCaptureActivity extends AppCompatActivity {
             builder.setPositiveButton("OK", new DialogInterface.OnClickListener() {
                 @Override
                 public void onClick(DialogInterface dialog, int which) {
-                    username = etUsername.getText().toString();
+                    // update username in shared preferences
+                    SharedPreferences.Editor ed = prefs.edit();
+                    String newUsername = etUsername.getText().toString();
+
+                    ed.putString(KEY_USERNAME, newUsername);
+                    ed.commit();
+
+                    // setting default username to usernameValue
+                    TextView usernameValueTextView = (TextView) findViewById(R.id.usernameValue);
+                    usernameValueTextView.setText(newUsername);
+
+                    // set username in oslog
+                    setUsernameInOSLog(newUsername);
                 }
             });
 
@@ -221,10 +263,6 @@ public class ScreenCaptureActivity extends AppCompatActivity {
             // using the following line to edit/commit prefs
             prefs.edit().putBoolean("first_run", false).commit();
         }
-
-        // keep setting text view with username
-        TextView usernameValueTextView = (TextView) findViewById(R.id.usernameValue);
-        usernameValueTextView.setText(username);
     }
 
     @Override
@@ -356,6 +394,10 @@ public class ScreenCaptureActivity extends AppCompatActivity {
         stopService(new Intent(this, LocationService.class));
     }
 
+    private void setUsernameInOSLog(String newUsername) {
+        ((OSLog) this.getApplication()).setUsername(newUsername);
+    }
+
     /****************************************** UI Widget Callbacks *******************************/
     private void startProjection() {
         MediaProjectionManager mProjectionManager =
@@ -468,7 +510,8 @@ public class ScreenCaptureActivity extends AppCompatActivity {
                     HttpsTrustManager.allowAllSSL();
                     HttpClient httpClient = new DefaultHttpClient();
                     httpClient.getConnectionManager().getSchemeRegistry().register(new Scheme("https", SSLSocketFactory.getSocketFactory(), 443));
-                    HttpPost postRequest = new HttpPost("https://entity.cs.helsinki.fi/upload.php");
+//                    HttpPost postRequest = new HttpPost("https://entity.cs.helsinki.fi/upload.php");
+                    HttpPost postRequest = new HttpPost("https://localhost:5000/upload.php");
                     //MultipartEntity reqEntity = new MultipartEntity(HttpMultipartMode.BROWSER_COMPATIBLE);
                     MultipartEntityBuilder builder = MultipartEntityBuilder.create();
                     builder.setMode(HttpMultipartMode.BROWSER_COMPATIBLE);
@@ -485,7 +528,8 @@ public class ScreenCaptureActivity extends AppCompatActivity {
                     //reqEntity.addPart("username", new StringBody(getMacAddr()));
                     builder.addPart("extra", new StringBody(extra, ContentType.TEXT_PLAIN));
                     builder.addPart("lang", new StringBody("en", ContentType.TEXT_PLAIN));
-                    // should change this into the username in log as well
+                    // username is the one in shared preferences
+                    String username = prefs.getString(KEY_USERNAME, defaultUsername);
 //                    builder.addPart("username", new StringBody(getMacAddr(), ContentType.TEXT_PLAIN));
                     builder.addPart("username", new StringBody(username, ContentType.TEXT_PLAIN));
                     try {

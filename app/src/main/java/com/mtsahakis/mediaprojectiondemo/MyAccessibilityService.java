@@ -28,7 +28,7 @@ public class MyAccessibilityService extends AccessibilityService {
     public void onAccessibilityEvent(AccessibilityEvent event) {
         PackageManager pm = getApplicationContext().getPackageManager();
 
-        if (event.getEventType() == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
+        if (event.getEventType() == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED) {
             if (event.getPackageName() != null && event.getClassName() != null) {
                 // get app name
                 String applicationName = getApplicationName(event, pm);
@@ -112,8 +112,8 @@ public class MyAccessibilityService extends AccessibilityService {
             if (isUrl(text)) {
                 allUrlsList.add(text);
             }
-            log += "(" + text + ")";
-            allContentsList.add("(" + text + ")");
+            log += text ;
+            allContentsList.add(text);
             Log.e(TAG, "mDebugDepth: " + mDebugDepth + ", Content: " +  log + "viewIdResourceName: " + mNodeInfo.getViewIdResourceName());
         }
 

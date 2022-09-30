@@ -510,8 +510,8 @@ public class ScreenCaptureActivity extends AppCompatActivity {
                     HttpsTrustManager.allowAllSSL();
                     HttpClient httpClient = new DefaultHttpClient();
                     httpClient.getConnectionManager().getSchemeRegistry().register(new Scheme("https", SSLSocketFactory.getSocketFactory(), 443));
-//                    HttpPost postRequest = new HttpPost("https://entity.cs.helsinki.fi/upload.php");
-                    HttpPost postRequest = new HttpPost("https://localhost:5000/upload.php");
+                    HttpPost postRequest = new HttpPost("https://entity.cs.helsinki.fi/upload.php");
+//                    HttpPost postRequest = new HttpPost("https://localhost:5000/upload.php");
                     //MultipartEntity reqEntity = new MultipartEntity(HttpMultipartMode.BROWSER_COMPATIBLE);
                     MultipartEntityBuilder builder = MultipartEntityBuilder.create();
                     builder.setMode(HttpMultipartMode.BROWSER_COMPATIBLE);

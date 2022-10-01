@@ -47,9 +47,9 @@ public class MyAccessibilityService extends AccessibilityService {
                 listToStringContent(allContentsList);
                 listToStringUrls(allUrlsList);
 
-                Log.i(TAG, "final allContent:" + allContents);
+//                Log.i(TAG, "final allContent:" + allContents);
                 ((OSLog) this.getApplication()).setContent(allContents);
-                Log.i(TAG, "final allUrls:" + allUrls);
+//                Log.i(TAG, "final allUrls:" + allUrls);
                 ((OSLog) this.getApplication()).setUrl(allUrls);
             }
         }
@@ -58,7 +58,7 @@ public class MyAccessibilityService extends AccessibilityService {
 
     public String getApplicationName(AccessibilityEvent event, PackageManager pm) {
         String applicationName = event.getPackageName().toString();
-        Log.e("PackageName App", applicationName);
+//        Log.e("PackageName App", applicationName);
 
         ApplicationInfo ai;
         try {
@@ -69,7 +69,7 @@ public class MyAccessibilityService extends AccessibilityService {
 
         if (ai != null) {
             applicationName = (String) pm.getApplicationLabel(ai);
-            Log.e("ApplicationName App", applicationName);
+//            Log.e("ApplicationName App", applicationName);
         }
 
         return applicationName;
@@ -114,7 +114,7 @@ public class MyAccessibilityService extends AccessibilityService {
             }
             log += text ;
             allContentsList.add(text);
-            Log.e(TAG, "mDebugDepth: " + mDebugDepth + ", Content: " +  log + "viewIdResourceName: " + mNodeInfo.getViewIdResourceName());
+//            Log.e(TAG, "mDebugDepth: " + mDebugDepth + ", Content: " +  log + "viewIdResourceName: " + mNodeInfo.getViewIdResourceName());
         }
 
         if (mNodeInfo.getChildCount() < 1) {

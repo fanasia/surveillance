@@ -523,15 +523,17 @@ public class ScreenCaptureActivity extends AppCompatActivity {
                     }
                     info.put("filename", fname.replaceAll(".txt", ""));
                     String extra = info.toString();
+                    Log.i("extra", extra);
                     //reqEntity.addPart("extra", new StringBody(extra, "text/plain", StandardCharsets.UTF_8));
                     //reqEntity.addPart("lang", new StringBody("en"));
                     //reqEntity.addPart("username", new StringBody(getMacAddr()));
                     builder.addPart("extra", new StringBody(extra, ContentType.TEXT_PLAIN));
-                    builder.addPart("lang", new StringBody("en", ContentType.TEXT_PLAIN));
+                    builder.addPart("lang", new StringBody("eng", ContentType.TEXT_PLAIN));
                     // username is the one in shared preferences
                     String username = prefs.getString(KEY_USERNAME, defaultUsername);
 //                    builder.addPart("username", new StringBody(getMacAddr(), ContentType.TEXT_PLAIN));
                     builder.addPart("username", new StringBody(username, ContentType.TEXT_PLAIN));
+                    // building image
                     try {
                         ByteArrayOutputStream bos = new ByteArrayOutputStream();
                         BitmapFactory.Options options = new BitmapFactory.Options();
@@ -540,11 +542,10 @@ public class ScreenCaptureActivity extends AppCompatActivity {
                         bitmap.compress(Bitmap.CompressFormat.JPEG, 75, bos);
                         byte[] data = bos.toByteArray();
                         ByteArrayBody bab = new ByteArrayBody(data, fname);
-                        //reqEntity.addPart("image", bab);
                         builder.addPart("image", bab);
                     } catch (Exception e) {
-                        //Log.v("Exception in Image", ""+e);
-                        //reqEntity.addPart("picture", new StringBody(""));
+                        Log.v("Exception in Image", ""+e);
+                        builder.addPart("image", new StringBody("", ContentType.TEXT_PLAIN));
                         builder.addPart("exception_in_image", new StringBody(e.toString(), ContentType.TEXT_PLAIN));
                     }
                     HttpEntity entity = builder.build();
@@ -557,6 +558,7 @@ public class ScreenCaptureActivity extends AppCompatActivity {
                         s = s.append(sResponse);
                     }
                     res = s.toString();
+                    Log.i("HTTP Response", res);
                     if (res.equals("file uploaded")) {
                         Log.e(TAG, "response " + s + "delete ..." + osPath);
                         File osFile = new File(osPath);
@@ -568,7 +570,7 @@ public class ScreenCaptureActivity extends AppCompatActivity {
 
                 return res;
             } catch (Exception e) {
-                Log.e(TAG, "response " + e.toString());
+                Log.e("Exception send request:", e.toString());
                 this.exception = e;
 
                 return "";

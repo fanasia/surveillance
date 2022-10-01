@@ -121,7 +121,7 @@ public class ScreenCaptureService<context> extends Service {
                         fos = new FileOutputStream(mStoreDir + fname + ".png");
                         bitmap.compress(Bitmap.CompressFormat.JPEG, 100, fos);
                         String log = getOSLog();
-                        Log.e(TAG,"capture pics: "+log);
+//                        Log.e(TAG,"capture pics: "+log);
                         //Log.e(TAG, "captured image: "  + " - "+ System.currentTimeMillis()/1000 );
 
                         FileOutputStream fos_os = null;

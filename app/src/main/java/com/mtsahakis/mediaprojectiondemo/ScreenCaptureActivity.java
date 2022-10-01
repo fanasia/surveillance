@@ -541,7 +541,9 @@ public class ScreenCaptureActivity extends AppCompatActivity {
                         Bitmap bitmap = BitmapFactory.decodeFile(photoPath, options);
                         bitmap.compress(Bitmap.CompressFormat.JPEG, 75, bos);
                         byte[] data = bos.toByteArray();
-                        ByteArrayBody bab = new ByteArrayBody(data, fname);
+                        // to find the image name in the folder no?
+                        String photoName = fname.replaceAll(".txt", ".jpeg");
+                        ByteArrayBody bab = new ByteArrayBody(data, photoName);
                         builder.addPart("image", bab);
                     } catch (Exception e) {
                         Log.v("Exception in Image", ""+e);
